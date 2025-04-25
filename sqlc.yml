@@ -1,0 +1,26 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "api/db/queries"
+    schema: "api/db/migrations"
+    gen:
+      go:
+        package:                       "db"
+        out:                           "api/db"
+        sql_package:                   database/sql
+        emit_empty_slices:             true
+        emit_methods_with_db_argument: true
+        emit_result_struct_pointers:   true
+        emit_interface:                true
+
+overrides:
+  go:
+    overrides:
+      - go_type: "encore.dev/types/uuid.UUID"
+        db_type: "uuid"
+      - go_type:
+          import: "encore.dev/types/uuid"
+          type: "UUID"
+          pointer: true
+        db_type: "uuid"
+        nullable: true

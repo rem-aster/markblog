@@ -1,10 +1,19 @@
 module encore.app
 
-go 1.18
+go 1.23
+
+toolchain go1.24.1
 
 require encore.dev v1.46.1
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
+	github.com/gorilla/securecookie v1.1.2 // indirect
+)
+
+require (
+	github.com/google/uuid v1.6.0
+	github.com/gorilla/sessions v1.4.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgx/v5 v5.2.0 // indirect
