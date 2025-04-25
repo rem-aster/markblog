@@ -78,7 +78,7 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.FS(subFS)).ServeHTTP(w, r)
 }
 
-//encore:api public raw path=/app/register
+//encore:api public raw path=/app/auth/register
 func Register(w http.ResponseWriter, r *http.Request) {
 	origin := r.Header.Get("Origin")
 	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
@@ -178,7 +178,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-//encore:api public raw path=/app/login
+//encore:api public raw path=/app/auth/login
 func Login(w http.ResponseWriter, r *http.Request) {
 	origin := r.Header.Get("Origin")
 	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
@@ -244,5 +244,95 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			"id":       user.ID,
 			"username": user.Username,
 		},
+	})
+}
+
+//encore:api public raw path=/app/auth/check
+func CheckAuth(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	}
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	session, err := store.Get(r, "markblog")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"authenticated": false,
+			"error":         "Session error",
+		})
+		return
+	}
+
+	authenticated, ok := session.Values["authenticated"].(bool)
+	if !ok || !authenticated {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"authenticated": false,
+		})
+		return
+	}
+
+	userID, _ := session.Values["user_id"].(string)
+	username, _ := session.Values["username"].(string)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"authenticated": true,
+		"user": map[string]interface{}{
+			"id":       userID,
+			"username": username,
+		},
+	})
+}
+
+//encore:api public raw path=/app/auth/logout
+func Logout(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	}
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	session, err := store.Get(r, "markblog")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Session error",
+		})
+		return
+	}
+
+	session.Values["authenticated"] = false
+	session.Values["user_id"] = ""
+	session.Values["username"] = ""
+	session.Options.MaxAge = -1 // Immediately expire the session
+
+	if err := session.Save(r, w); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to save session",
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
 	})
 }

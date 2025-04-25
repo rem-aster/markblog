@@ -1,25 +1,31 @@
-// stores/auth.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import Client from '../client'
+import Client, { Local } from '../client'
 
 export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = ref(false)
-  const client = new Client('http://localhost:4000') // or your production URL
+  const isLoading = ref(false)
+  const client = new Client(Local, {
+    requestInit: {
+      credentials: 'include',
+    },
+  })
 
-  // Check auth status on app load
   async function checkAuth() {
+    isLoading.value = true
     try {
-      // Replace with your actual auth check endpoint
-      const response = await client.webapp.Login('GET')
-      isAuthenticated.value = response.ok
+      const response = await client.webapp.CheckAuth('GET')
+      const data = await response.json()
+      isAuthenticated.value = data['authenticated']
     } catch (error) {
       isAuthenticated.value = false
+    } finally {
+      isLoading.value = false
     }
   }
 
-  // Login function
   async function login(credentials: { username: string; password: string }) {
+    isLoading.value = true
     try {
       const response = await client.webapp.Login(
         'POST',
@@ -36,15 +42,18 @@ export const useAuthStore = defineStore('auth', () => {
 
       const data = await response.json()
       console.log('Login successful:', data)
-      return data
+      checkAuth()
+      return true
     } catch (error) {
       console.error('Login failed:', error)
       // Handle error (show message to user, etc.)
+    } finally {
+      isLoading.value = false
     }
   }
 
-  // Register function
   async function register(credentials: { username: string; password: string }) {
+    isLoading.value = true
     try {
       const response = await client.webapp.Register(
         'POST',
@@ -61,17 +70,28 @@ export const useAuthStore = defineStore('auth', () => {
 
       const data = await response.json()
       console.log('Registration successful:', data)
-      return data
+      checkAuth()
+      return true
     } catch (error) {
       console.error('Registration failed:', error)
       // Handle error
+    } finally {
+      isLoading.value = false
     }
   }
 
-  // Logout function
-  function logout() {
-    isAuthenticated.value = false
-    // Add any additional logout logic here
+  async function logout() {
+    isLoading.value = true
+    try {
+      isAuthenticated.value = false
+      const response = await client.webapp.Logout('GET')
+      const data = await response.json()
+      console.log('Login successful:', data)
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      isLoading.value = false
+    }
   }
 
   return {

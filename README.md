@@ -2,6 +2,21 @@
 
 [![xc compatible](https://xcfile.dev/badge.svg)](https://xcfile.dev)
 
+Practice project
+
+## Stack
+
+- Encore
+- Go
+- PostgreSQL
+- sqlc
+- Vue
+- Typescript
+- Pinia
+- TailwindCSS
+- DaisyUI
+- Docker
+
 ## Tasks
 
 ### dev

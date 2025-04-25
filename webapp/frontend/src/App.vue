@@ -4,10 +4,23 @@
       <a class="text-lg font-black underline decoration-3" href="/">markblog</a>
     </template>
     <template #end>
-      <div v-if="isAuthenticated">
-        <a class="btn btn-square btn-primary">
-          <Pen class="size-[24px] text-primary-content" />
-        </a>
+      <div class="inline-flex gap-2" v-if="isAuthenticated">
+        <div class="tooltip tooltip-bottom tooltip-primary">
+          <div class="tooltip-content">
+            <div class="font-black">New Post</div>
+          </div>
+          <a class="btn btn-square btn-primary">
+            <Pen class="size-[24px] text-primary-content" />
+          </a>
+        </div>
+        <div class="tooltip tooltip-bottom">
+          <div class="tooltip-content">
+            <div class="font-black">Logout</div>
+          </div>
+          <a class="btn btn-ghost font-black btn-square" @click="authStore.logout()">
+            <Exit class="size-[24px] text-neutral" />
+          </a>
+        </div>
       </div>
       <div class="inline-flex gap-2" v-else>
         <a class="btn btn-primary transition ease-in-out hover:scale-110" @click="openModalLogin()"
@@ -104,8 +117,8 @@ import { RouterView } from 'vue-router'
 import Pen from './components/icons/Pen.vue'
 import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
-import { ref } from 'vue'
-import Client, { Local } from './client.ts'
+import { ref, onMounted } from 'vue'
+import Exit from './components/icons/Exit.vue'
 
 const authStore = useAuthStore()
 const { isAuthenticated } = storeToRefs(authStore)
@@ -128,17 +141,17 @@ function closeModal() {
 const username = ref('')
 const password = ref('')
 
-const client = new Client(Local, {
-  requestInit: {
-    credentials: 'include',
-  },
-})
-
 async function handleLogin() {
-  authStore.login({ username: username.value, password: password.value })
+  if (await authStore.login({ username: username.value, password: password.value })) {
+  }
 }
 
 async function handleRegister() {
-  authStore.register({ username: username.value, password: password.value })
+  if (await authStore.register({ username: username.value, password: password.value })) {
+  }
 }
+
+onMounted(() => {
+  authStore.checkAuth()
+})
 </script>
