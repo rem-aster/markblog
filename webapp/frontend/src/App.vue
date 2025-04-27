@@ -9,35 +9,38 @@
           <div class="tooltip-content">
             <div class="font-black">New Post</div>
           </div>
-          <a class="btn btn-square btn-primary">
-            <Pen class="size-[24px] text-primary-content" />
+          <a class="btn btn-square btn-primary" @click="openModalPost()">
+            <Pen class="text-primary-content" />
+          </a>
+        </div>
+        <div class="tooltip tooltip-bottom">
+          <div class="tooltip-content">
+            <div class="font-black">Settings</div>
+          </div>
+          <a class="btn btn-neutral font-black btn-square">
+            <Cog class="text-neutral-content" />
           </a>
         </div>
         <div class="tooltip tooltip-bottom">
           <div class="tooltip-content">
             <div class="font-black">Logout</div>
           </div>
-          <a class="btn btn-ghost font-black btn-square" @click="authStore.logout()">
-            <Exit class="size-[24px] text-neutral" />
+          <a class="btn btn-neutral font-black btn-square" @click="authStore.logout()">
+            <Exit class="text-neutral-content" />
           </a>
         </div>
       </div>
+
       <div class="inline-flex gap-2" v-else>
-        <a class="btn btn-primary transition ease-in-out hover:scale-110" @click="openModalLogin()"
-          >Login</a
-        >
-        <a
-          class="btn btn-neutral transition ease-in-out hover:scale-110"
-          @click="openModalRegister()"
-          >Register</a
-        >
+        <a class="btn btn-primary font-black" @click="openModalLogin()">Login</a>
+        <a class="btn btn-neutral font-black" @click="openModalRegister()">Register</a>
       </div>
     </template>
   </Navbar>
 
   <Modal :open="openedModal == 'login'">
-    <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
-      ✕
+    <button class="btn btn-xs btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
+      <Close class="text-base-content" />
     </button>
     <h1 class="font-black text-primary text-xl mb-4">Login</h1>
     <form @submit.prevent="handleLogin">
@@ -72,8 +75,8 @@
   </Modal>
 
   <Modal :open="openedModal == 'register'">
-    <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
-      ✕
+    <button class="btn btn-xs btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
+      <Close class="text-base-content" />
     </button>
     <h1 class="font-black text-xl mb-4">Register</h1>
     <form @submit.prevent="handleRegister">
@@ -107,6 +110,13 @@
     </form>
   </Modal>
 
+  <Modal :open="openedModal == 'post'">
+    <button class="btn btn-xs btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
+      <Close class="text-base-content" />
+    </button>
+    <Editor />
+  </Modal>
+
   <RouterView />
 </template>
 
@@ -119,6 +129,11 @@ import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
 import { ref, onMounted } from 'vue'
 import Exit from './components/icons/Exit.vue'
+import Close from './components/icons/Close.vue'
+import Editor from './components/ui/Editor.vue'
+import Cog from './components/icons/Cog.vue'
+import Lock from './components/icons/Lock.vue'
+import User from './components/icons/User.vue'
 
 const authStore = useAuthStore()
 const { isAuthenticated } = storeToRefs(authStore)
@@ -134,6 +149,10 @@ function openModalLogin() {
   openedModal.value = 'login'
 }
 
+function openModalPost() {
+  openedModal.value = 'post'
+}
+
 function closeModal() {
   openedModal.value = ''
 }
@@ -143,11 +162,13 @@ const password = ref('')
 
 async function handleLogin() {
   if (await authStore.login({ username: username.value, password: password.value })) {
+    closeModal()
   }
 }
 
 async function handleRegister() {
   if (await authStore.register({ username: username.value, password: password.value })) {
+    closeModal()
   }
 }
 

@@ -5,6 +5,7 @@ import Client, { Local } from '../client'
 export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = ref(false)
   const isLoading = ref(false)
+  const username = ref('')
   const client = new Client(Local, {
     requestInit: {
       credentials: 'include',
@@ -17,6 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await client.webapp.CheckAuth('GET')
       const data = await response.json()
       isAuthenticated.value = data['authenticated']
+      username.value = data['user']['username']
     } catch (error) {
       isAuthenticated.value = false
     } finally {
@@ -86,7 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = false
       const response = await client.webapp.Logout('GET')
       const data = await response.json()
-      console.log('Login successful:', data)
+      console.log('Logout successful:', data)
     } catch (error) {
       console.error('Logout failed:', error)
     } finally {
@@ -96,6 +98,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     isAuthenticated,
+    username,
+    isLoading,
     checkAuth,
     login,
     register,
