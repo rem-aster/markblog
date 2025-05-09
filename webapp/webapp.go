@@ -600,7 +600,7 @@ func Activity(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	
 	var req struct {
-		ID uuid.UUID `json:"id"`
+		Username string `json:"username"`
 		Limit int32 `json:"limit"`
 		Offset int32 `json:"offset"`
 	}
@@ -610,12 +610,12 @@ func Activity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := req.ID
+	username := req.Username
 	limit := req.Limit
 	offset := req.Offset
 	
 	res, err := api.GetLatestUserActivity(r.Context(), db.GetLatestUserActivityParams{
-		UserID: id,
+		Username: username,
 		Limit: limit,
 		Offset: offset,
 	})
@@ -626,6 +626,6 @@ func Activity(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"comments": res.Activity,
+		"activity": res.Activity,
 	})
 }

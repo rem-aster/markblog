@@ -63,6 +63,11 @@ func (q *Queries) CreateUser(ctx context.Context, db DBTX, arg CreateUserParams)
 }
 
 const getLatestUserActivity = `-- name: GetLatestUserActivity :many
+WITH user_info AS (
+    SELECT id
+    FROM users
+    WHERE username = $1
+)
 SELECT
     p.id AS post_id,
     p.content,
@@ -71,7 +76,7 @@ SELECT
 FROM
     posts p
 WHERE
-    p.user_id = $1
+    p.user_id = (SELECT id FROM user_info)
 UNION ALL
 SELECT
     c.id AS post_id,
@@ -81,7 +86,7 @@ SELECT
 FROM
     comments c
 WHERE
-    c.user_id = $1
+    c.user_id = (SELECT id FROM user_info)
 ORDER BY
     action_time DESC
 LIMIT 
@@ -91,9 +96,9 @@ OFFSET
 `
 
 type GetLatestUserActivityParams struct {
-	UserID uuid.UUID
-	Limit  int32
-	Offset int32
+	Username string
+	Limit    int32
+	Offset   int32
 }
 
 type GetLatestUserActivityRow struct {
@@ -104,7 +109,7 @@ type GetLatestUserActivityRow struct {
 }
 
 func (q *Queries) GetLatestUserActivity(ctx context.Context, db DBTX, arg GetLatestUserActivityParams) ([]*GetLatestUserActivityRow, error) {
-	rows, err := db.QueryContext(ctx, getLatestUserActivity, arg.UserID, arg.Limit, arg.Offset)
+	rows, err := db.QueryContext(ctx, getLatestUserActivity, arg.Username, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

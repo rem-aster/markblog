@@ -2,12 +2,8 @@
   <main class="pt-16">
     <Hero>
       <div class="flex flex-col gap-2 content-center">
-        <Post
-          v-for="post in posts"
-          :key="post.id"
-          :content="post.content"
-        >
-          <Profile :username="post.username" @click="openModalActivity()"/>
+        <Post v-for="post in posts" :key="post.id" :content="post.content">
+          <Profile :username="post.username" @click="openModalActivity(post.username)" />
           <button
             class="btn btn-xs btn-square btn-ghost shadow-xl"
             @click="openModalComments(post.id)"
@@ -30,7 +26,7 @@
       </div>
     </Hero>
   </main>
-  
+
   <Modal :open="openedModal == 'comments'">
     <button class="btn btn-xs btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
       <Close class="text-base-content" />
@@ -77,13 +73,43 @@
       </div>
     </div>
   </Modal>
-  
+
   <Modal :open="openedModal == 'activity'">
     <button class="btn btn-xs btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
       <Close class="text-base-content" />
     </button>
     <div class="flex flex-col">
-      <h1 class="text-xl font-semibold">Comments</h1>
+      <h1 class="text-xl font-semibold">@{{ activityUsername }}'s Activity</h1>
+
+      <div class="overflow-y-auto max-h-76 gap-2 flex flex-col">
+        <ul class="list">
+          <Activity
+            v-for="act in activity"
+            :key="act.postId"
+            :content="act.content"
+            :activityType="act.activityType"
+            :activityTime="act.activityTime"
+          />
+        </ul>
+        <button
+          v-if="!loading && hasMoreActivity"
+          @click="fetchActivity"
+          class="btn btn-neutral btn-sm mt-2"
+        >
+          Load More
+        </button>
+
+        <div v-if="loading" class="text-center py-4 mt-2">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+
+        <div
+          v-if="!hasMoreActivity"
+          class="text-center text-sm text-base-content font-semibold py-4 mt-2"
+        >
+          No more activity
+        </div>
+      </div>
     </div>
   </Modal>
 </template>
@@ -100,6 +126,8 @@ import Client, { Local } from '../client'
 import Comment from '@/components/ui/Comment.vue'
 import { useAlert } from '@/services/alert'
 import { useAuthStore } from '@/stores/auth'
+import Profile from '@/components/ui/Profile.vue'
+import Activity from '@/components/ui/Activity.vue'
 
 const authStore = useAuthStore()
 
@@ -148,8 +176,11 @@ const openedModal = defineModel<string>('openedModal')
 
 function closeModal() {
   commentsPost.value = ''
+  activityUsername.value = ''
   comments.value = []
+  activity.value = []
   commentOffset.value = 0
+  activityOffset.value = 0
   hasMoreComments.value = true
   hasMoreActivity.value = true
   openedModal.value = ''
@@ -162,10 +193,12 @@ const canComment = computed(() => {
 })
 
 const commentsPost = ref('')
-const activityID = ref('')
+const activityUsername = ref('')
 const posts = ref<Array<{ id: string; username: string; content: string }>>([])
 const comments = ref<Array<{ id: string; username: string; content: string }>>([])
-const activity = ref<Array<{ id: string; username: string; content: string }>>([])
+const activity = ref<
+  Array<{ postId: string; activityTime: string; content: string; activityType: string }>
+>([])
 const loading = ref(false)
 const hasMorePosts = ref(true)
 const hasMoreComments = ref(true)
@@ -181,10 +214,10 @@ async function openModalComments(postID: string) {
   openedModal.value = 'comments'
 }
 
-async function openModalActivity(userID: string) {
-  activityID.value = userID
+async function openModalActivity(username: string) {
+  activityUsername.value = username
   await fetchActivity()
-  openedModal.value = 'comments'
+  openedModal.value = 'activity'
 }
 
 async function fetchPosts() {
@@ -310,7 +343,7 @@ async function fetchActivity() {
     const response = await client.webapp.Activity(
       'POST',
       JSON.stringify({
-        id: activityID.value,
+        username: activityUsername.value,
         offset: activityOffset.value,
         limit: limit,
       }),

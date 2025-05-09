@@ -46,6 +46,11 @@ SELECT
     ) AS user_exists;
 
 -- name: GetLatestUserActivity :many
+WITH user_info AS (
+    SELECT id
+    FROM users
+    WHERE username = $1
+)
 SELECT
     p.id AS post_id,
     p.content,
@@ -54,7 +59,7 @@ SELECT
 FROM
     posts p
 WHERE
-    p.user_id = $1
+    p.user_id = (SELECT id FROM user_info)
 UNION ALL
 SELECT
     c.id AS post_id,
@@ -64,7 +69,7 @@ SELECT
 FROM
     comments c
 WHERE
-    c.user_id = $1
+    c.user_id = (SELECT id FROM user_info)
 ORDER BY
     action_time DESC
 LIMIT 
