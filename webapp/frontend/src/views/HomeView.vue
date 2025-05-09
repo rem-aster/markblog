@@ -1,5 +1,5 @@
 <template>
-  <main class="pt-16">
+  <main>
     <Hero>
       <div class="flex flex-col gap-2 content-center">
         <Post v-for="post in posts" :key="post.id" :content="post.content">
