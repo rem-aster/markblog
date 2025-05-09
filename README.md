@@ -2,9 +2,9 @@
 
 [![xc compatible](https://xcfile.dev/badge.svg)](https://xcfile.dev)
 
-Practice project
+Для поднятия локально требуется установить [encore](https://encore.dev) и запустить проект с помощью ```encore run```
 
-## Stack
+## Стэк
 
 - Encore
 - Go
@@ -18,6 +18,11 @@ Practice project
 - Docker
 
 ## Tasks
+
+### run
+```bash
+encore run
+```
 
 ### dev
 
