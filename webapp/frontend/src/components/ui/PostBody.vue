@@ -1,10 +1,10 @@
 <template>
-  <div class="flex flex-row gap-2">
-    <div class="flex flex-col gap-2 items-end">
-      
-      <slot> </slot>
-    </div>
-    <PostBody :content="content" />
+  <div class="card bg-base-100 shadow-xl w-50">
+    <div
+      class="card-body text-wrap prose break-words whitespace-normal"
+      :class="{ 'text-base-300': content === '' }"
+      v-html="content === '' ? 'Empty' : content"
+    ></div>
   </div>
 </template>
 
@@ -12,8 +12,6 @@
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { computed } from 'vue'
-import PostBody from './PostBody.vue'
-import Profile from './Profile.vue'
 
 const props = defineProps<{
   content?: string

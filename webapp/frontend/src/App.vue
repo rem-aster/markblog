@@ -67,7 +67,9 @@
           placeholder="Qwerty123"
         />
 
-        <button class="btn btn-primary mt-4">Login</button>
+        <button class="btn btn-primary mt-4" :class="{ 'btn-disabled': authStore.isLoading }">
+          Login
+        </button>
 
         <a class="link link-hover place-end-end" @click="openModalRegister()">Register instead</a>
       </fieldset>
@@ -103,27 +105,28 @@
           placeholder="Qwerty123"
         />
 
-        <button class="btn btn-neutral mt-4">Register</button>
+        <button class="btn btn-neutral mt-4" :class="{ 'btn-disabled': authStore.isLoading }">
+          Register
+        </button>
 
         <a class="link link-hover place-end-end" @click="openModalLogin()">Login instead</a>
       </fieldset>
     </form>
   </Modal>
 
-  <Modal :open="openedModal == 'post'">
+  <Modal :open="openedModal == 'post'" class="">
     <button class="btn btn-xs btn-circle btn-ghost absolute right-2 top-2" @click="closeModal()">
       <Close class="text-base-content" />
     </button>
-    <Editor />
+    <Editor @post-submit="handlePostSubmit" />
   </Modal>
 
-  <RouterView />
+  <HomeView v-model="openedModal" @comment-submit="handleCommentSubmit" />
 </template>
 
 <script setup lang="ts">
 import Navbar from './components/ui/Navbar.vue'
 import Modal from './components/ui/Modal.vue'
-import { RouterView } from 'vue-router'
 import Pen from './components/icons/Pen.vue'
 import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
@@ -132,12 +135,10 @@ import Exit from './components/icons/Exit.vue'
 import Close from './components/icons/Close.vue'
 import Editor from './components/ui/Editor.vue'
 import Cog from './components/icons/Cog.vue'
-import Lock from './components/icons/Lock.vue'
-import User from './components/icons/User.vue'
+import HomeView from './views/HomeView.vue'
 
 const authStore = useAuthStore()
 const { isAuthenticated } = storeToRefs(authStore)
-const { logout } = authStore
 
 const openedModal = ref('')
 
@@ -160,14 +161,29 @@ function closeModal() {
 const username = ref('')
 const password = ref('')
 
+function handlePostSubmit() {
+  closeModal()
+  window.location.reload()
+}
+
+function handleCommentSubmit() {
+  window.location.reload()
+}
+
 async function handleLogin() {
-  if (await authStore.login({ username: username.value, password: password.value })) {
+  if (
+    (await authStore.login({ username: username.value, password: password.value })) &&
+    authStore.isAuthenticated
+  ) {
     closeModal()
   }
 }
 
 async function handleRegister() {
-  if (await authStore.register({ username: username.value, password: password.value })) {
+  if (
+    (await authStore.register({ username: username.value, password: password.value })) &&
+    authStore.isAuthenticated
+  ) {
     closeModal()
   }
 }

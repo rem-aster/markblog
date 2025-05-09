@@ -1,7 +1,6 @@
 package webapp
 
 import (
-	"database/sql"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"encore.dev/storage/sqldb"
+	"encore.dev/types/uuid"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
 
@@ -127,10 +127,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exists, err := api.CheckUserExists(r.Context(), username)
+	
 	if err != nil && !errors.Is(err, sqldb.ErrNoRows) {
 		http.Error(w, `{"error":"Database error"}`, http.StatusInternalServerError)
 		return
 	}
+	
 	if exists.Exists {
 		http.Error(w, `{"error":"Username already taken"}`, http.StatusConflict)
 		return
@@ -205,10 +207,22 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"Username and password are required"}`, http.StatusBadRequest)
 		return
 	}
+	
+	exists, err := api.CheckUserExists(r.Context(), username)
+	
+	if err != nil && !errors.Is(err, sqldb.ErrNoRows) {
+		http.Error(w, `{"error":"Database error"}`, http.StatusInternalServerError)
+		return
+	}
+	
+	if !exists.Exists {
+		http.Error(w, `{"error":"User does not exist"}`, http.StatusNotFound)
+		return
+	}
 
 	user, err := api.GetUserByUsername(r.Context(), username)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sqldb.ErrNoRows) {
 			http.Error(w, `{"error":"Invalid credentials"}`, http.StatusUnauthorized)
 			return
 		}
@@ -274,15 +288,34 @@ func CheckAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	authenticated, ok := session.Values["authenticated"].(bool)
+	userID := session.Values["user_id"].(string)
+	username := session.Values["username"].(string)
+	
 	if !ok || !authenticated {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"authenticated": false,
 		})
 		return
 	}
+	
+	exists, err := api.CheckUserExists(r.Context(), username)
+	
+	if err != nil && !errors.Is(err, sqldb.ErrNoRows) || !exists.Exists{
+		session.Values["authenticated"] = false
+		session.Values["user_id"] = ""
+		session.Values["username"] = ""
+		session.Options.MaxAge = -1 // Immediately expire the session
 
-	userID, _ := session.Values["user_id"].(string)
-	username, _ := session.Values["username"].(string)
+		if err := session.Save(r, w); err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   "Failed to save session",
+			})
+			return
+		}
+		http.Error(w, `{"error":"User outdated"}`, http.StatusConflict)
+		return
+	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"authenticated": true,
@@ -334,5 +367,265 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
+	})
+}
+
+//encore:api public raw path=/app/post
+func Post(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	}
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	var req struct {
+		Content string `json:"content"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	content := req.Content
+
+	if content == "" || len(content) > 300{
+		http.Error(w, `{"error":"Content length is invalid}`, http.StatusBadRequest)
+		return
+	}
+	
+	session, err := store.Get(r, "markblog")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Session error",
+		})
+		return
+	}
+	
+	post, err := api.CreatePost(r.Context(), db.CreatePostParams{
+		UserID: uuid.Must(uuid.FromString(session.Values["user_id"].(string))),
+		Content: content,
+	})
+	
+	if err != nil {
+		http.Error(w, `{"error":"Database error"}`, http.StatusInternalServerError)
+		return
+	}
+	
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id": post.ID,
+	})
+}
+
+//encore:api public raw path=/app/feed
+func Feed(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	}
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	var req struct {
+		Offset int32 `json:"offset"`
+		Limit int32 `json:"limit"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	offset := req.Offset
+	limit := req.Limit
+	
+	posts, err := api.GetLatestPosts(r.Context(), db.GetLatestPostsParams{
+		Offset: offset,
+		Limit: limit,
+	})
+	
+	if err != nil {
+		http.Error(w, `{"error":"Database error"}`, http.StatusInternalServerError)
+		return
+	}
+	
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"posts": posts.Posts,
+	})
+}
+
+//encore:api public raw path=/app/discussion
+func Discussion(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	}
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	var req struct {
+		ID uuid.UUID `json:"id"`
+		Limit int32 `json:"limit"`
+		Offset int32 `json:"offset"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	id := req.ID
+	limit := req.Limit
+	offset := req.Offset
+	
+	comments, err := api.GetLatestCommentsForPost(r.Context(), db.GetLatestCommentsForPostParams{
+		PostID: id,
+		Limit: limit,
+		Offset: offset,
+	})
+	
+	if err != nil {
+		http.Error(w, `{"error":"Database error"}`, http.StatusInternalServerError)
+		return
+	}
+	
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"comments": comments.Comments,
+	})
+}
+
+//encore:api public raw path=/app/comment
+func Comment(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	}
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	var req struct {
+		PostID uuid.UUID `json:"post_id"`
+		Content string `json:"content"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	postID := req.PostID
+	content:= req.Content
+	
+	if content == "" || len(content) > 128{
+		http.Error(w, `{"error":"Content length is invalid}`, http.StatusBadRequest)
+		return
+	}
+	
+	session, err := store.Get(r, "markblog")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Session error",
+		})
+		return
+	}
+	
+	userID := uuid.Must(uuid.FromString(session.Values["user_id"].(string)))
+	
+	comment, err := api.CreateComment(r.Context(), db.CreateCommentParams{
+		PostID: postID,
+		UserID: &userID,
+		Content: content,
+	})
+	
+	if err != nil {
+		http.Error(w, `{"error":"Database error"}`, http.StatusInternalServerError)
+		return
+	}
+	
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id": comment.ID,
+	})
+}
+
+//encore:api public raw path=/app/activity
+func Activity(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "http://127.0.0.1:4000" || origin == "http://localhost:4000" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	}
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	var req struct {
+		ID uuid.UUID `json:"id"`
+		Limit int32 `json:"limit"`
+		Offset int32 `json:"offset"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	id := req.ID
+	limit := req.Limit
+	offset := req.Offset
+	
+	res, err := api.GetLatestUserActivity(r.Context(), db.GetLatestUserActivityParams{
+		UserID: id,
+		Limit: limit,
+		Offset: offset,
+	})
+	
+	if err != nil {
+		http.Error(w, `{"error":"Database error"}`, http.StatusInternalServerError)
+		return
+	}
+	
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"comments": res.Activity,
 	})
 }

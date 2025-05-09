@@ -11,7 +11,7 @@ RETURNING
     created_at,
     updated_at;
 
--- name: GetCommentbyID :one
+-- name: GetCommentByID :one
 SELECT
     id,
     post_id,
@@ -24,16 +24,21 @@ FROM
 WHERE
     id = $1;
 
--- name: GetAllCommentsForPost :many
+-- name: GetLatestCommentsForPost :many
 SELECT
     c.id,
     c.content,
     c.created_at,
-    u.username AS author
+    u.username AS username
 FROM
     comments c
-    JOIN users u ON c.user_id = u.id
+JOIN
+    users u ON c.user_id = u.id
 WHERE
     c.post_id = $1
 ORDER BY
-    c.created_at ASC;
+    c.created_at DESC
+LIMIT
+    $2
+OFFSET
+    $3;

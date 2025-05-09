@@ -45,12 +45,9 @@ SELECT
             username = $1
     ) AS user_exists;
 
--- name: GetUserActivity :many
-BEGIN;
-
+-- name: GetLatestUserActivity :many
 SELECT
     p.id AS post_id,
-    p.title,
     p.content,
     p.created_at AS action_time,
     'post' AS action_type
@@ -69,6 +66,8 @@ FROM
 WHERE
     c.user_id = $1
 ORDER BY
-    action_time ASC;
-
-COMMIT;
+    action_time DESC
+LIMIT 
+    $2
+OFFSET 
+    $3;

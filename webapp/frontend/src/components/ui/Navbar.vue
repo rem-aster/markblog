@@ -1,5 +1,5 @@
 <template>
-  <header class="navbar rounded-xl bg-base-100 shadow-xl fixed z-50">
+  <header class="navbar bg-base-100 shadow-xl fixed z-50">
     <nav v-if="$slots.start" class="navbar-start ml-2">
       <slot name="start"></slot>
     </nav>

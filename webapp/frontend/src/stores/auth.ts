@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import Client, { Local } from '../client'
+import { useAlert } from '@/services/alert'
+
+const alert = useAlert()
 
 export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = ref(false)
@@ -20,9 +23,11 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = data['authenticated']
       username.value = data['user']['username']
     } catch (error) {
+      console.error('Auth check failed:', error)
       isAuthenticated.value = false
     } finally {
       isLoading.value = false
+      return isAuthenticated
     }
   }
 
@@ -44,13 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
 
       const data = await response.json()
       console.log('Login successful:', data)
-      checkAuth()
-      return true
     } catch (error) {
       console.error('Login failed:', error)
-      // Handle error (show message to user, etc.)
+      alert.error('Login failed: ' + error, {
+        position: 'bottom-right',
+        closable: true,
+      })
     } finally {
       isLoading.value = false
+      return checkAuth()
     }
   }
 
@@ -72,13 +79,15 @@ export const useAuthStore = defineStore('auth', () => {
 
       const data = await response.json()
       console.log('Registration successful:', data)
-      checkAuth()
-      return true
     } catch (error) {
       console.error('Registration failed:', error)
-      // Handle error
+      alert.error('Registration failed: ' + error, {
+        position: 'bottom-right',
+        closable: true,
+      })
     } finally {
       isLoading.value = false
+      return checkAuth()
     }
   }
 
@@ -91,6 +100,10 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('Logout successful:', data)
     } catch (error) {
       console.error('Logout failed:', error)
+      alert.error('Logout failed: ' + error, {
+        position: 'bottom-right',
+        closable: true,
+      })
     } finally {
       isLoading.value = false
     }
